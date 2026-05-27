@@ -19,16 +19,13 @@ import {
   saveStoredBookUpload,
   updateStoredBookProgress
 } from "@/lib/ebook/browser-storage";
+import { resolveReadModeGuide } from "@/lib/ebook/book-metadata";
 import type { BookRecord, SessionUser } from "@/lib/ebook/types";
 import { cn } from "@/lib/utils";
 
 type AuthMode = "login" | "signup";
 
-type ReadModeGuide = {
-  label: string;
-  title: string;
-  steps: string[];
-};
+type ReadModeGuide = ReturnType<typeof resolveReadModeGuide>;
 
 export function EbookReaderApp() {
   const [authMode, setAuthMode] = useState<AuthMode>("signup");
@@ -243,7 +240,7 @@ export function EbookReaderApp() {
       }
     }
 
-    setReadModeGuide(resolveReadModeGuide());
+    setReadModeGuide(resolveReadModeGuide(navigator.userAgent));
   }
 
   async function disableReadMode() {
@@ -368,17 +365,17 @@ export function EbookReaderApp() {
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(164,92,68,0.22),transparent_32%),linear-gradient(180deg,#f3e5d0_0%,#e1c7a8_100%)] px-4 py-5 text-[#3d241b] sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <header className="rounded-[30px] border border-[#8b5a46]/30 bg-[#5a392d]/92 px-5 py-5 text-[#f3e5d0] shadow-[0_30px_80px_rgba(53,29,22,0.28)] sm:px-7">
+        <header className="rounded-[30px] border border-[#8b5a46]/22 bg-[#f1e2cc]/90 px-5 py-5 text-[#4e342e] shadow-[0_30px_80px_rgba(53,29,22,0.16)] sm:px-7">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#d7b899]/25 bg-[#f3e5d0]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[#f0d2bb]">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#8d4f39]/18 bg-[#fff5e7]/72 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[#8d4f39]">
                 <BookOpen className="h-3.5 w-3.5" />
                 Ebook Reader
               </div>
-              <h1 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-[#fff5e7] sm:text-5xl [font-family:'Iowan_Old_Style','Palatino_Linotype','Book_Antiqua',Georgia,serif]">
+              <h1 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-[#4e342e] sm:text-5xl [font-family:'Iowan_Old_Style','Palatino_Linotype','Book_Antiqua',Georgia,serif]">
                 Your shelf, your pace, your quiet.
               </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-[#f0d2bb] sm:text-base">
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-[#704034] sm:text-base">
                 A Vercel-ready reader that keeps each user&apos;s books in their own browser on
                 their own device, while preserving the tactile 16:9 book experience.
               </p>
@@ -1064,9 +1061,9 @@ function EpubSurface({
 
 function Pill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[22px] border border-[#d7b899]/18 bg-[#fff5e7]/8 px-3 py-3 text-center">
-      <div className="text-lg font-semibold text-[#fff5e7]">{value}</div>
-      <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#e9c8ad]">
+    <div className="rounded-[22px] border border-[#8d4f39]/16 bg-[#fff8ef]/72 px-3 py-3 text-center">
+      <div className="text-lg font-semibold text-[#4e342e]">{value}</div>
+      <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8d4f39]">
         {label}
       </div>
     </div>
@@ -1191,66 +1188,4 @@ function StatusChip({ label }: { label: string }) {
       {label}
     </div>
   );
-}
-
-function resolveReadModeGuide(): ReadModeGuide {
-  const ua = navigator.userAgent.toLowerCase();
-
-  if (ua.includes("windows")) {
-    return {
-      label: "Windows",
-      title: "Turn on Focus on Windows",
-      steps: [
-        "Open the Notification Center from the taskbar.",
-        "Turn on Focus or Do Not Disturb before returning to the book.",
-        "Keep reading here while the app stays fullscreen and the screen stays awake."
-      ]
-    };
-  }
-
-  if (ua.includes("android")) {
-    return {
-      label: "Android",
-      title: "Turn on Do Not Disturb on Android",
-      steps: [
-        "Swipe down from the top of your phone to open Quick Settings.",
-        "Tap Do Not Disturb or Bedtime mode.",
-        "Return to the book and continue reading in fullscreen."
-      ]
-    };
-  }
-
-  if (ua.includes("iphone") || ua.includes("ipad")) {
-    return {
-      label: "iPhone or iPad",
-      title: "Turn on Focus on iPhone or iPad",
-      steps: [
-        "Open Control Center.",
-        "Tap Focus and choose Do Not Disturb or Reading.",
-        "Come back to the app to continue in your quiet reading mode."
-      ]
-    };
-  }
-
-  if (ua.includes("mac os")) {
-    return {
-      label: "macOS",
-      title: "Turn on Focus on macOS",
-      steps: [
-        "Open Control Center from the menu bar.",
-        "Choose Focus, then enable Do Not Disturb or Reading.",
-        "Return to the book once your Mac is quiet."
-      ]
-    };
-  }
-
-  return {
-    label: "your device",
-    title: "Turn on your device's quiet mode",
-    steps: [
-      "Open your device's quick settings, control center, or notification panel.",
-      "Enable Do Not Disturb, Focus, Bedtime, or another quiet mode.",
-      "Return here to keep reading in fullscreen."
-    ]
-  };
 }

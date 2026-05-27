@@ -1,67 +1,54 @@
 # Architecture
 
-## Request Flow
+## Current Flow
 
 ```text
-Workbench UI
-  -> POST /api/process
-  -> validate request with Zod
-  -> parse YouTube video ID
-  -> fetch metadata when YOUTUBE_API_KEY exists
-  -> estimate duration from provider data or transcript
-  -> build output plan
-  -> generate drafts
-  -> persist job in development store
-  -> return structured result
+Landing screen
+  -> user signs up or logs in with email + password
+  -> account is stored in browser IndexedDB
+  -> user uploads EPUB or PDF
+  -> file blob is stored in browser IndexedDB
+  -> library and recent books are rendered from local browser state
+  -> user opens a book
+  -> reader creates an object URL from the stored blob
+  -> PDF or EPUB renderer displays pages inside the 16:9 book shell
+  -> reading progress is written back to IndexedDB
 ```
 
-## Production Flow
+## Reader Model
 
-```text
-Workbench UI
-  -> API creates processing_job row
-  -> queue event
-  -> worker fetches transcript or transcribes audio
-  -> worker chunks transcript
-  -> worker generates content assets
-  -> worker persists outputs
-  -> UI polls job status or receives realtime update
-```
+- The first open state is always the book cover.
+- Only forward navigation is meaningful from the cover state.
+- PDF files render through `pdfjs-dist`.
+- EPUB files render through `epubjs`.
+- A shared reader shell handles arrows, swipe-up close, recent-book resume, and page-turn sound.
 
-## Reliability Rules
+## Read Mode
 
-- Validate all inputs at the edge.
-- Keep video processing outside request-response handlers.
-- Persist job progress after each step.
-- Make worker steps idempotent.
-- Retry transient provider failures with backoff.
-- Store structured errors and user-safe recovery messages.
-- Meter usage before expensive provider calls.
-- Apply duration and transcript-size limits by subscription plan.
+- Read Mode enters fullscreen when available.
+- Read Mode requests a screen wake lock when supported.
+- Read Mode presents OS-specific guidance for Focus or Do Not Disturb.
+- Browser security rules prevent the app from directly turning on system Do Not Disturb.
 
-## Suggested Tables
+## Deployment Model
 
-```sql
-users
-workspaces
-workspace_members
-youtube_sources
-processing_jobs
-transcripts
-content_outputs
-usage_events
-subscriptions
-prompt_versions
-```
+- The app is safe to deploy on Vercel because it does not require server-side writable storage.
+- User data lives in browser IndexedDB on the client.
+- No database or blob store is required for the current version.
 
-## Provider Boundaries
+## Limitations Of The Current Model
 
-- YouTube metadata provider
-- Transcript provider
-- Transcription provider
-- AI generation provider
-- Job queue provider
-- Billing and metering provider
-- Object storage provider
+- Accounts are local to one browser profile.
+- Uploaded books do not sync across devices.
+- Clearing browser storage removes the library.
+- This is a local-first web experience, not yet a cloud-synced library platform.
 
-Keeping these boundaries explicit lets the app start lean while remaining deployable as a real SaaS.
+## Future Cloud-Sync Path
+
+To evolve this into a real cross-device product, add:
+
+- Server-side auth
+- A database for users and progress
+- Blob or object storage for ebooks
+- Access control around private libraries
+- Sync conflict handling for last-read position

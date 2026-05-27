@@ -1,6 +1,7 @@
 "use client";
 
-import type { BookRecord, ReaderFormat, SessionUser, UserRecord } from "@/lib/ebook/types";
+import type { BookRecord, SessionUser, UserRecord } from "@/lib/ebook/types";
+import { inferFormat, inferTitle, normalizeEmail } from "@/lib/ebook/book-metadata";
 
 const DB_NAME = "ebook-reader-web";
 const DB_VERSION = 1;
@@ -10,10 +11,6 @@ const BOOKS_STORE = "books";
 type StoredBookRecord = BookRecord & {
   fileBlob: Blob;
 };
-
-function normalizeEmail(email: string) {
-  return email.trim().toLowerCase();
-}
 
 function requestToPromise<T>(request: IDBRequest<T>) {
   return new Promise<T>((resolve, reject) => {
@@ -61,18 +58,6 @@ async function hashPassword(email: string, password: string) {
   return Array.from(new Uint8Array(digest))
     .map((part) => part.toString(16).padStart(2, "0"))
     .join("");
-}
-
-function inferFormat(fileName: string, mimeType: string): ReaderFormat {
-  if (mimeType === "application/epub+zip" || fileName.toLowerCase().endsWith(".epub")) {
-    return "epub";
-  }
-
-  return "pdf";
-}
-
-function inferTitle(fileName: string) {
-  return fileName.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim() || "Untitled Book";
 }
 
 function toBookRecord(book: StoredBookRecord): BookRecord {

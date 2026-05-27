@@ -1,14 +1,26 @@
-# Forge
+# Ebook Reader
 
-Forge is a production-shaped SaaS starter for turning YouTube sources into newsletters, LinkedIn posts, and short-form scripts. The current implementation includes a premium workbench UI, guarded API routes, duration-based content planning, deterministic draft generation, tests, and Vercel-ready configuration.
+`Ebook Reader` is a Vercel-ready web app for reading uploaded `EPUB` and `PDF` files inside a tactile 16:9 book interface. It includes email-based signup and login, recent-books resume flow, page-turn sound, swipe-up close, and a Read Mode that guides users to enable Focus or Do Not Disturb on their device.
+
+## Current Storage Model
+
+This deployed version is `browser-local`, not cloud-synced.
+
+- Accounts are stored in the user’s current browser.
+- Uploaded books are stored in the user’s current browser on that device.
+- Reading progress and recent books are stored in the same browser.
+- Clearing browser storage, switching browsers, or switching devices will not carry the library over.
+
+This model is what makes the app deploy cleanly to Vercel without needing a database or file-storage service.
 
 ## Stack
 
 - Next.js App Router
 - TypeScript
 - Tailwind CSS
-- Zod validation
-- Vitest
+- IndexedDB for browser-local persistence
+- `pdfjs-dist` for PDF rendering
+- `epubjs` for EPUB rendering
 - Vercel deployment target
 
 ## Local Setup
@@ -20,61 +32,47 @@ npm.cmd run dev
 
 Open `http://localhost:3000`.
 
-PowerShell may block `npm.ps1` on Windows, so the commands above use `npm.cmd`.
+PowerShell may block `npm.ps1`, so the commands above use `npm.cmd`.
 
-## Environment
+## Features
 
-Copy `.env.example` to `.env.local` and fill in keys as integrations are added.
+- Email and password signup/login
+- Local book import for `PDF` and `EPUB`
+- Realistic 16:9 cover-first reading surface
+- Left and right page-turn navigation
+- Swipe-up gesture to close the reader
+- Tap-to-continue on recently opened books
+- Read Mode with fullscreen, wake lock, and OS-specific Focus guidance
+- Coffee, brown, biscuit, and red-brown visual system across desktop and mobile
 
-```bash
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-YOUTUBE_API_KEY=
-OPENAI_API_KEY=
-DATABASE_URL=
-SENTRY_DSN=
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
-```
-
-Without `YOUTUBE_API_KEY`, the app still works in demo mode with safe metadata fallbacks. Pasting transcript notes produces richer drafts until transcript extraction is wired in.
-
-## Production Architecture
-
-The code is organized so providers can be swapped in without rewriting the UI:
-
-- `lib/youtube.ts`: YouTube parsing and metadata fetching
-- `lib/content/planner.ts`: video-length-to-output planning
-- `lib/content/generator.ts`: content generation adapter boundary
-- `lib/content/processor.ts`: orchestrates validation, metadata, planning, and generation
-- `lib/jobs/store.ts`: development job storage
-
-For production SaaS use, replace the memory job store with Postgres and move long-running work to Trigger.dev, Inngest, or Upstash QStash. Vercel request handlers should create jobs and return quickly; workers should handle transcript extraction, transcription fallback, AI generation, retries, and usage metering.
-
-## Deployment
+## Deployment To Vercel
 
 1. Push this repository to GitHub.
-2. Import the GitHub repository into Vercel.
-3. Add environment variables in Vercel.
-4. Use preview deployments for pull requests.
-5. Promote to production after CI passes.
+2. Import the repository into Vercel as a Next.js project.
+3. Deploy with the default settings.
 
-The included GitHub Actions workflow runs install, typecheck, tests, lint, and build.
+No environment variables are required for the current browser-local version.
+
+## Important Vercel Behavior
+
+- Vercel only hosts the application shell and frontend code.
+- User accounts and uploaded books are not stored on Vercel servers in this version.
+- Each user keeps their own library inside their browser storage.
+- This means the app works well as a shareable hosted experience, but not yet as a multi-device synced product.
 
 ## Verification
 
 ```bash
 npm.cmd run typecheck
-npm.cmd run test
 npm.cmd run lint
 npm.cmd run build
 ```
 
-## Next Production Steps
+## Next Production Step
 
-- Add auth with Clerk or Auth.js.
-- Add Postgres with Drizzle or Prisma.
-- Replace `lib/jobs/store.ts` with persisted jobs.
-- Add transcript extraction and transcription fallback.
-- Add OpenAI/Anthropic generation providers behind `lib/content/generator.ts`.
-- Add Stripe metering and plan limits.
-- Add Sentry and product analytics.
+If you want true multi-device sync later, add:
+
+- A database for accounts and progress
+- Object storage for uploaded books
+- Real server-side auth and session management
+- Optional encryption or private-library controls
