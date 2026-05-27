@@ -11,26 +11,18 @@ import {
   Volume2,
   X
 } from "lucide-react";
+import {
+  getStoredBookBlob,
+  listStoredBooks,
+  loginStoredUser,
+  registerStoredUser,
+  saveStoredBookUpload,
+  updateStoredBookProgress
+} from "@/lib/ebook/browser-storage";
 import type { BookRecord, SessionUser } from "@/lib/ebook/types";
 import { cn } from "@/lib/utils";
 
 type AuthMode = "login" | "signup";
-
-type AuthResponse =
-  | { ok: true; user: SessionUser }
-  | { ok: false; error: string };
-
-type BooksResponse =
-  | { ok: true; books: BookRecord[] }
-  | { ok: false; error: string };
-
-type UploadResponse =
-  | { ok: true; book: BookRecord }
-  | { ok: false; error: string };
-
-type ProgressResponse =
-  | { ok: true; book: BookRecord | null }
-  | { ok: false; error: string };
 
 type ReadModeGuide = {
   label: string;
@@ -45,10 +37,12 @@ export function EbookReaderApp() {
   const [session, setSession] = useState<SessionUser | null>(null);
   const [books, setBooks] = useState<BookRecord[]>([]);
   const [readerBook, setReaderBook] = useState<BookRecord | null>(null);
+  const [readerBookUrl, setReaderBookUrl] = useState<string | null>(null);
   const [readerPage, setReaderPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [isBusy, setIsBusy] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [openingBookId, setOpeningBookId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [readModeEnabled, setReadModeEnabled] = useState(false);
@@ -59,6 +53,7 @@ export function EbookReaderApp() {
   const swipeStartY = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const readerShellRef = useRef<HTMLDivElement | null>(null);
+  const readerBookUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     const savedSession = window.localStorage.getItem("ebook-reader-session");
@@ -96,6 +91,7 @@ export function EbookReaderApp() {
 
   useEffect(() => {
     return () => {
+      clearReaderUrl();
       void disableReadMode();
     };
   }, []);
@@ -116,15 +112,12 @@ export function EbookReaderApp() {
   async function loadBooks(userEmail: string) {
     setError(null);
 
-    const response = await fetch(`/api/books?email=${encodeURIComponent(userEmail)}`);
-    const payload = (await response.json()) as BooksResponse;
-
-    if (!payload.ok) {
-      setError(payload.error);
-      return;
+    try {
+      const nextBooks = await listStoredBooks(userEmail);
+      setBooks(nextBooks);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not load books from this browser.");
     }
-
-    setBooks(payload.books);
   }
 
   async function handleAuthSubmit() {
@@ -133,24 +126,17 @@ export function EbookReaderApp() {
     setMessage(null);
 
     try {
-      const endpoint = authMode === "signup" ? "/api/auth/register" : "/api/auth/login";
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
-      });
-      const payload = (await response.json()) as AuthResponse;
+      const user =
+        authMode === "signup"
+          ? await registerStoredUser(email, password)
+          : await loginStoredUser(email, password);
 
-      if (!payload.ok) {
-        throw new Error(payload.error);
-      }
-
-      window.localStorage.setItem("ebook-reader-session", JSON.stringify(payload.user));
-      setSession(payload.user);
+      window.localStorage.setItem("ebook-reader-session", JSON.stringify(user));
+      setSession(user);
       setMessage(
         authMode === "signup"
-          ? "Account created and saved to your local workbook."
-          : "Welcome back to your shelf."
+          ? "Account created and saved in this browser."
+          : "Welcome back to your local shelf."
       );
       setPassword("");
     } catch (caught) {
@@ -172,22 +158,9 @@ export function EbookReaderApp() {
     setMessage(null);
 
     try {
-      const formData = new FormData();
-      formData.set("email", session.email);
-      formData.set("file", file);
-
-      const response = await fetch("/api/books", {
-        method: "POST",
-        body: formData
-      });
-      const payload = (await response.json()) as UploadResponse;
-
-      if (!payload.ok) {
-        throw new Error(payload.error);
-      }
-
-      setBooks((current) => [payload.book, ...current]);
-      setMessage(`${payload.book.title} was saved locally on this device.`);
+      const book = await saveStoredBookUpload(session.email, file);
+      setBooks((current) => [book, ...current]);
+      setMessage(`${book.title} was saved in this browser on this device.`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Upload failed.");
     } finally {
@@ -197,37 +170,57 @@ export function EbookReaderApp() {
   }
 
   async function saveProgress(userEmail: string, bookId: string, currentPage: number) {
-    const response = await fetch("/api/books/progress", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: userEmail, bookId, currentPage })
-    });
-    const payload = (await response.json()) as ProgressResponse;
+    try {
+      const updatedBook = await updateStoredBookProgress(userEmail, bookId, currentPage);
 
-    if (!payload.ok || !payload.book) {
+      if (!updatedBook) {
+        return;
+      }
+
+      setBooks((current) =>
+        current.map((book) => {
+          return book.id === updatedBook.id ? updatedBook : book;
+        })
+      );
+    } catch {
+      // Avoid interrupting reading if progress persistence fails.
+    }
+  }
+
+  async function openBook(book: BookRecord, mode: "cover" | "continue") {
+    if (!session) {
       return;
     }
 
-    setBooks((current) =>
-      current.map((book) => {
-        return book.id === payload.book?.id ? payload.book : book;
-      })
-    );
-  }
-
-  function openBook(book: BookRecord, mode: "cover" | "continue") {
-    setReaderBook(book);
-    setReaderPage(mode === "continue" ? book.currentPage : 0);
-    setTotalPages(book.totalPagesHint);
-    setReaderMounted(true);
+    setOpeningBookId(book.id);
+    setError(null);
     setMessage(null);
+
+    try {
+      const fileBlob = await getStoredBookBlob(session.email, book.id);
+      clearReaderUrl();
+
+      const objectUrl = URL.createObjectURL(fileBlob);
+      readerBookUrlRef.current = objectUrl;
+      setReaderBookUrl(objectUrl);
+      setReaderBook(book);
+      setReaderPage(mode === "continue" ? book.currentPage : 0);
+      setTotalPages(book.totalPagesHint);
+      setReaderMounted(true);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not open this book.");
+    } finally {
+      setOpeningBookId(null);
+    }
   }
 
   async function closeReader() {
     setReaderMounted(false);
     setReaderBook(null);
+    setReaderBookUrl(null);
     setReaderPage(0);
     setReadModeGuide(null);
+    clearReaderUrl();
     await disableReadMode();
   }
 
@@ -272,6 +265,13 @@ export function EbookReaderApp() {
       } finally {
         wakeLockRef.current = null;
       }
+    }
+  }
+
+  function clearReaderUrl() {
+    if (readerBookUrlRef.current) {
+      URL.revokeObjectURL(readerBookUrlRef.current);
+      readerBookUrlRef.current = null;
     }
   }
 
@@ -356,11 +356,13 @@ export function EbookReaderApp() {
 
   function logout() {
     window.localStorage.removeItem("ebook-reader-session");
+    clearReaderUrl();
     setSession(null);
     setBooks([]);
     setReaderBook(null);
+    setReaderBookUrl(null);
     setReaderPage(0);
-    setMessage("Signed out from this device.");
+    setMessage("Signed out from this browser.");
   }
 
   return (
@@ -377,14 +379,14 @@ export function EbookReaderApp() {
                 Your shelf, your pace, your quiet.
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-[#f0d2bb] sm:text-base">
-                Import local EPUB or PDF books, open them inside a tactile 16:9 reader, continue
-                from recent sessions, and step into Read Mode whenever you want a calmer space.
+                A Vercel-ready reader that keeps each user&apos;s books in their own browser on
+                their own device, while preserving the tactile 16:9 book experience.
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Pill label="Storage" value="Local only" />
-              <Pill label="Read Mode" value="Focus prompt" />
+              <Pill label="Deploy" value="Vercel ready" />
+              <Pill label="Storage" value="Browser local" />
               <Pill label="Format" value="EPUB + PDF" />
               <Pill label="Sound" value={soundEnabled ? "On" : "Muted"} />
             </div>
@@ -410,6 +412,12 @@ export function EbookReaderApp() {
                 >
                   {authMode === "signup" ? "Log in" : "Sign up"}
                 </button>
+              </div>
+
+              <div className="mt-4 rounded-[22px] border border-[#8d4f39]/18 bg-[#f8ead7] p-4 text-sm leading-6 text-[#704034]">
+                This web version stores accounts and books in your current browser using local
+                device storage. It deploys cleanly to Vercel, but your library does not sync across
+                devices unless we add cloud storage later.
               </div>
 
               <div className="mt-6 space-y-4">
@@ -442,7 +450,7 @@ export function EbookReaderApp() {
                   onClick={handleAuthSubmit}
                   type="button"
                 >
-                  {isBusy ? "Saving your shelf..." : authMode === "signup" ? "Create account" : "Log in"}
+                  {isBusy ? "Preparing your shelf..." : authMode === "signup" ? "Create account" : "Log in"}
                 </button>
               </div>
             </div>
@@ -460,13 +468,13 @@ export function EbookReaderApp() {
               />
               <FeatureCard
                 eyebrow="Storage"
-                title="Everything stays local"
-                body="Accounts live in a local Excel workbook, and uploaded books stay in device-local folders rather than a cloud shelf."
+                title="Vercel-safe local storage"
+                body="Accounts, uploaded books, and reading progress live in browser IndexedDB instead of a writable server filesystem."
               />
               <FeatureCard
                 eyebrow="Flow"
                 title="Continue where you stopped"
-                body="Recent books appear on the home shelf and reopen at the last saved page with a single tap."
+                body="Recent books appear on the home shelf and reopen at the last saved page with a single tap on the same browser and device."
               />
             </div>
           </section>
@@ -497,8 +505,8 @@ export function EbookReaderApp() {
                   Import an ebook
                 </div>
                 <p className="mt-2 text-sm leading-6 text-[#7a5547]">
-                  Upload a local `PDF` or `EPUB`. The file stays on this device and is added to
-                  your shelf immediately.
+                  Upload a local `PDF` or `EPUB`. The file stays in this browser on this device and
+                  is added to your shelf immediately.
                 </p>
                 <input
                   accept=".pdf,.epub,application/pdf,application/epub+zip"
@@ -513,7 +521,7 @@ export function EbookReaderApp() {
                   onClick={() => fileInputRef.current?.click()}
                   type="button"
                 >
-                  {isUploading ? "Saving locally..." : "Choose file"}
+                  {isUploading ? "Saving in browser..." : "Choose file"}
                 </button>
               </div>
 
@@ -529,15 +537,9 @@ export function EbookReaderApp() {
                   </button>
                 </div>
                 <div className="mt-3 grid gap-3">
-                  <PreferenceRow
-                    label="Page-turn sound"
-                    value={soundEnabled ? "Enabled" : "Muted"}
-                  />
-                  <PreferenceRow
-                    label="Read Mode"
-                    value="Fullscreen + OS guidance"
-                  />
-                  <PreferenceRow label="Storage" value="Workbook + local folders" />
+                  <PreferenceRow label="Page-turn sound" value={soundEnabled ? "Enabled" : "Muted"} />
+                  <PreferenceRow label="Read Mode" value="Fullscreen + OS guidance" />
+                  <PreferenceRow label="Storage" value="IndexedDB in browser" />
                 </div>
               </div>
 
@@ -571,16 +573,17 @@ export function EbookReaderApp() {
                     recentBooks.map((book) => (
                       <BookCard
                         book={book}
-                        cta="Continue reading"
+                        cta={openingBookId === book.id ? "Opening..." : "Continue reading"}
+                        disabled={openingBookId === book.id}
                         key={book.id}
-                        onOpen={() => openBook(book, "continue")}
+                        onOpen={() => void openBook(book, "continue")}
                         progressLabel={book.currentPage > 0 ? `Resume at page ${book.currentPage}` : "Open cover"}
                       />
                     ))
                   ) : (
                     <EmptyShelf
                       title="No recent reading yet"
-                      body="Open a book once and it will return here as a one-tap continue card."
+                      body="Open a book once and it will return here as a one-tap continue card in this browser."
                     />
                   )}
                 </div>
@@ -592,7 +595,7 @@ export function EbookReaderApp() {
                     Library
                   </div>
                   <h3 className="mt-2 text-2xl text-[#4e342e] [font-family:'Iowan_Old_Style','Palatino_Linotype','Book_Antiqua',Georgia,serif]">
-                    Your local books
+                    Your browser-local books
                   </h3>
                 </div>
 
@@ -601,9 +604,10 @@ export function EbookReaderApp() {
                     books.map((book) => (
                       <BookCard
                         book={book}
-                        cta="Open cover"
+                        cta={openingBookId === book.id ? "Opening..." : "Open cover"}
+                        disabled={openingBookId === book.id}
                         key={book.id}
-                        onOpen={() => openBook(book, "cover")}
+                        onOpen={() => void openBook(book, "cover")}
                         progressLabel={
                           book.currentPage > 0 ? `Last saved page ${book.currentPage}` : "Not started"
                         }
@@ -612,7 +616,7 @@ export function EbookReaderApp() {
                   ) : (
                     <EmptyShelf
                       title="Your shelf is waiting"
-                      body="Import a PDF or EPUB from the panel on the left to start building your offline library."
+                      body="Import a PDF or EPUB from the panel on the left to start building your offline library in this browser."
                     />
                   )}
                 </div>
@@ -622,7 +626,7 @@ export function EbookReaderApp() {
         )}
       </div>
 
-      {readerMounted && readerBook && session ? (
+      {readerMounted && readerBook && readerBookUrl ? (
         <div className="fixed inset-0 z-50 bg-[rgba(46,23,16,0.72)] p-3 sm:p-6">
           <div
             className="mx-auto flex h-full max-w-7xl flex-col rounded-[30px] border border-[#c79c7d]/25 bg-[#3a231c]/98 p-4 text-[#f8ead7] shadow-[0_30px_120px_rgba(18,9,7,0.55)]"
@@ -686,8 +690,8 @@ export function EbookReaderApp() {
               <div className="flex w-full max-w-5xl justify-center">
                 <ReaderSurface
                   book={readerBook}
+                  bookUrl={readerBookUrl}
                   currentPage={readerPage}
-                  email={session.email}
                   onPageChange={setReaderPage}
                   onTotalPagesChange={setTotalPages}
                 />
@@ -755,14 +759,14 @@ export function EbookReaderApp() {
 
 function ReaderSurface({
   book,
+  bookUrl,
   currentPage,
-  email,
   onPageChange,
   onTotalPagesChange
 }: {
   book: BookRecord;
+  bookUrl: string;
   currentPage: number;
-  email: string;
   onPageChange: (page: number) => void;
   onTotalPagesChange: (count: number) => void;
 }) {
@@ -792,17 +796,15 @@ function ReaderSurface({
 
   return book.format === "pdf" ? (
     <PdfSurface
-      book={book}
+      bookUrl={bookUrl}
       currentPage={currentPage}
-      email={email}
       onPageChange={onPageChange}
       onTotalPagesChange={onTotalPagesChange}
     />
   ) : (
     <EpubSurface
-      book={book}
+      bookUrl={bookUrl}
       currentPage={currentPage}
-      email={email}
       onPageChange={onPageChange}
       onTotalPagesChange={onTotalPagesChange}
     />
@@ -810,15 +812,13 @@ function ReaderSurface({
 }
 
 function PdfSurface({
-  book,
+  bookUrl,
   currentPage,
-  email,
   onPageChange,
   onTotalPagesChange
 }: {
-  book: BookRecord;
+  bookUrl: string;
   currentPage: number;
-  email: string;
   onPageChange: (page: number) => void;
   onTotalPagesChange: (count: number) => void;
 }) {
@@ -835,7 +835,7 @@ function PdfSurface({
         import.meta.url
       ).toString();
 
-      const loadingTask = pdfjs.getDocument(`/api/books/file/${book.id}?email=${encodeURIComponent(email)}`);
+      const loadingTask = pdfjs.getDocument(bookUrl);
       const pdf = await loadingTask.promise;
 
       if (disposed) {
@@ -852,7 +852,7 @@ function PdfSurface({
       disposed = true;
       pdfRef.current = null;
     };
-  }, [book.id, email, onTotalPagesChange]);
+  }, [bookUrl, onTotalPagesChange]);
 
   useEffect(() => {
     let disposed = false;
@@ -920,7 +920,7 @@ function PdfSurface({
               the reader and return to your shelf.
             </p>
             <div className="text-xs uppercase tracking-[0.22em] text-[#8d4f39]">
-              Local PDF render
+              Browser PDF render
             </div>
           </div>
         </div>
@@ -930,15 +930,13 @@ function PdfSurface({
 }
 
 function EpubSurface({
-  book,
+  bookUrl,
   currentPage,
-  email,
   onPageChange,
   onTotalPagesChange
 }: {
-  book: BookRecord;
+  bookUrl: string;
   currentPage: number;
-  email: string;
   onPageChange: (page: number) => void;
   onTotalPagesChange: (count: number) => void;
 }) {
@@ -977,7 +975,7 @@ function EpubSurface({
 
       containerRef.current.innerHTML = "";
 
-      const epubBook = createBook(`/api/books/file/${book.id}?email=${encodeURIComponent(email)}`);
+      const epubBook = createBook(bookUrl);
       bookRef.current = epubBook;
       await epubBook.ready;
       await epubBook.locations.generate?.(900);
@@ -1019,7 +1017,7 @@ function EpubSurface({
       renditionRef.current = null;
       bookRef.current = null;
     };
-  }, [book.id, email, onPageChange, onTotalPagesChange]);
+  }, [bookUrl, onPageChange, onTotalPagesChange]);
 
   useEffect(() => {
     const rendition = renditionRef.current;
@@ -1055,7 +1053,7 @@ function EpubSurface({
               a book instead of a plain document viewer.
             </p>
             <div className="text-xs uppercase tracking-[0.22em] text-[#8d4f39]">
-              Local EPUB render
+              Browser EPUB render
             </div>
           </div>
         </div>
@@ -1118,17 +1116,20 @@ function PreferenceRow({ label, value }: { label: string; value: string }) {
 function BookCard({
   book,
   cta,
+  disabled = false,
   onOpen,
   progressLabel
 }: {
   book: BookRecord;
   cta: string;
+  disabled?: boolean;
   onOpen: () => void;
   progressLabel: string;
 }) {
   return (
     <button
-      className="group rounded-[24px] border border-[#8b5a46]/16 bg-[#fcf2e3] p-4 text-left shadow-[0_14px_40px_rgba(82,50,35,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_50px_rgba(82,50,35,0.14)]"
+      className="group rounded-[24px] border border-[#8b5a46]/16 bg-[#fcf2e3] p-4 text-left shadow-[0_14px_40px_rgba(82,50,35,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_50px_rgba(82,50,35,0.14)] disabled:cursor-not-allowed disabled:opacity-70"
+      disabled={disabled}
       onClick={onOpen}
       type="button"
     >
@@ -1245,9 +1246,9 @@ function resolveReadModeGuide(): ReadModeGuide {
 
   return {
     label: "your device",
-    title: "Turn on your device’s quiet mode",
+    title: "Turn on your device's quiet mode",
     steps: [
-      "Open your device’s quick settings, control center, or notification panel.",
+      "Open your device's quick settings, control center, or notification panel.",
       "Enable Do Not Disturb, Focus, Bedtime, or another quiet mode.",
       "Return here to keep reading in fullscreen."
     ]

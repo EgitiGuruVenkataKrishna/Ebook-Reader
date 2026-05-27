@@ -18,7 +18,6 @@ export interface BookRecord {
   author: string;
   format: ReaderFormat;
   fileName: string;
-  filePath: string;
   mimeType: string;
   currentPage: number;
   totalPagesHint: number;
