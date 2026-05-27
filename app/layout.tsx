@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Forge - YouTube Content Processing",
-  description: "Turn YouTube videos into newsletters, LinkedIn posts, and short-form scripts."
+  title: "Ebook Reader",
+  description: "Import local EPUB and PDF books into a tactile reader with offline storage."
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

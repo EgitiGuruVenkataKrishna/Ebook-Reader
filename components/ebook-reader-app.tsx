@@ -942,13 +942,13 @@ function EpubSurface({
   onPageChange: (page: number) => void;
   onTotalPagesChange: (count: number) => void;
 }) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const renditionRef = useRef<{
+  type EpubRendition = {
     display: (target?: string) => Promise<void>;
     destroy?: () => void;
     on: (event: string, callback: (location: { start?: { cfi?: string } }) => void) => void;
-  } | null>(null);
-  const bookRef = useRef<{
+  };
+
+  type EpubBook = {
     ready: Promise<void>;
     locations: {
       total?: number;
@@ -956,16 +956,20 @@ function EpubSurface({
       locationFromCfi?: (cfi: string) => number;
       generate?: (size: number) => Promise<void>;
     };
-    renderTo: (target: HTMLElement, options: Record<string, unknown>) => typeof renditionRef.current;
+    renderTo: (target: HTMLElement, options: Record<string, unknown>) => EpubRendition;
     destroy?: () => void;
-  } | null>(null);
+  };
+
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const renditionRef = useRef<EpubRendition | null>(null);
+  const bookRef = useRef<EpubBook | null>(null);
 
   useEffect(() => {
     let disposed = false;
 
     async function setup() {
       const epubModule = await import("epubjs");
-      const createBook = (epubModule.default ?? epubModule) as (url: string) => typeof bookRef.current;
+      const createBook = (epubModule.default ?? epubModule) as (url: string) => EpubBook;
 
       if (!containerRef.current) {
         return;
@@ -1003,13 +1007,7 @@ function EpubSurface({
         onPageChange(pageNumber);
       });
 
-      if (currentPage > 0) {
-        const cfi = epubBook.locations.cfiFromLocation?.(Math.max(0, currentPage - 1));
-
-        await rendition.display(cfi ?? undefined);
-      } else {
-        await rendition.display();
-      }
+      await rendition.display();
     }
 
     void setup();
@@ -1021,7 +1019,24 @@ function EpubSurface({
       renditionRef.current = null;
       bookRef.current = null;
     };
-  }, [book.id, currentPage, email, onPageChange, onTotalPagesChange]);
+  }, [book.id, email, onPageChange, onTotalPagesChange]);
+
+  useEffect(() => {
+    const rendition = renditionRef.current;
+    const epubBook = bookRef.current;
+
+    if (!rendition || !epubBook || currentPage <= 0) {
+      return;
+    }
+
+    const cfi = epubBook.locations.cfiFromLocation?.(Math.max(0, currentPage - 1));
+
+    if (!cfi) {
+      return;
+    }
+
+    void rendition.display(cfi);
+  }, [currentPage]);
 
   return (
     <div className="ebook-book-frame aspect-video w-full max-w-5xl">

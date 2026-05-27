@@ -9,3 +9,4 @@ dist
 *.tsbuildinfo
 .next-dev*.log
 vercel-output
+data/ebook-reader

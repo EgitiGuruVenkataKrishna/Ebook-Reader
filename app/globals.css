@@ -4,8 +4,8 @@
 
 :root {
   color-scheme: light;
-  background: #f7f4ee;
-  color: #171412;
+  background: #f3e5d0;
+  color: #3d241b;
 }
 
 * {
@@ -20,11 +20,10 @@ body {
   min-height: 100vh;
   margin: 0;
   background:
-    linear-gradient(90deg, rgba(222, 216, 203, 0.35) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(222, 216, 203, 0.35) 1px, transparent 1px),
-    #f7f4ee;
-  background-size: 44px 44px;
-  color: #171412;
+    radial-gradient(circle at top, rgba(164, 92, 68, 0.18), transparent 28%),
+    linear-gradient(180deg, #f3e5d0 0%, #e1c7a8 100%);
+  color: #3d241b;
+  font-family: "Segoe UI", "Trebuchet MS", sans-serif;
 }
 
 button,
@@ -35,8 +34,8 @@ select {
 }
 
 ::selection {
-  background: #d88b21;
-  color: #171412;
+  background: #8d4f39;
+  color: #fff6e9;
 }
 
 .focus-ring {
@@ -44,5 +43,59 @@ select {
 }
 
 .focus-ring:focus-visible {
-  box-shadow: 0 0 0 3px rgba(216, 139, 33, 0.35);
+  box-shadow: 0 0 0 3px rgba(141, 79, 57, 0.28);
+}
+
+.ebook-book-frame {
+  border: 1px solid rgba(215, 184, 153, 0.18);
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, rgba(128, 81, 60, 0.9), rgba(70, 38, 28, 0.98)),
+    linear-gradient(90deg, rgba(255, 246, 233, 0.08), rgba(255, 246, 233, 0));
+  box-shadow: 0 28px 90px rgba(16, 8, 6, 0.42);
+  padding: 18px;
+}
+
+.ebook-book-spread {
+  position: relative;
+  display: grid;
+  height: 100%;
+  grid-template-columns: minmax(0, 1fr);
+  overflow: hidden;
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(252, 244, 230, 0.98), rgba(239, 223, 197, 0.98));
+}
+
+@media (min-width: 768px) {
+  .ebook-book-spread {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.ebook-book-gutter {
+  position: absolute;
+  inset: 0 auto 0 50%;
+  width: 14px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, rgba(90, 57, 45, 0.34), rgba(141, 79, 57, 0.08));
+  box-shadow:
+    0 0 35px rgba(77, 43, 31, 0.28),
+    inset 0 0 24px rgba(255, 244, 226, 0.24);
+}
+
+.ebook-page-panel {
+  position: relative;
+  display: flex;
+  min-height: 100%;
+  background:
+    linear-gradient(180deg, rgba(255, 250, 242, 0.98), rgba(245, 234, 216, 0.98));
+}
+
+.ebook-page-panel:first-of-type {
+  box-shadow: inset -14px 0 26px rgba(90, 57, 45, 0.08);
+}
+
+.ebook-page-panel:last-of-type {
+  box-shadow: inset 14px 0 26px rgba(90, 57, 45, 0.08);
 }
