@@ -1,78 +1,126 @@
 # Ebook Reader
 
-`Ebook Reader` is a Vercel-ready web app for reading uploaded `EPUB` and `PDF` files inside a tactile 16:9 book interface. It includes email-based signup and login, recent-books resume flow, page-turn sound, swipe-up close, and a Read Mode that guides users to enable Focus or Do Not Disturb on their device.
+**Ebook Reader** is a warm, tactile web reading experience for people who already have their own `EPUB` and `PDF` files and want to open them inside a beautiful, book-like interface instead of a flat document viewer.
 
-## Current Storage Model
+It is designed to feel calm, focused, and physical:
 
-This deployed version is `browser-local`, not cloud-synced.
+- a cover-first opening experience
+- a cinematic `16:9` reading stage
+- left and right page turns
+- recent-book resume
+- page-turn sound
+- a user-invoked Read Mode with Focus / Do Not Disturb guidance
 
-- Accounts are stored in the user’s current browser.
-- Uploaded books are stored in the user’s current browser on that device.
-- Reading progress and recent books are stored in the same browser.
-- Clearing browser storage, switching browsers, or switching devices will not carry the library over.
+## What It Feels Like
 
-This model is what makes the app deploy cleanly to Vercel without needing a database or file-storage service.
+This is not a generic file viewer.
 
-## Stack
+The app is built to make digital books feel more like something you *open* than something you merely *scroll through*. The visual language stays inside a coffee, brown, biscuit, and red-brown palette, and the reading surface is framed like a desk-ready book spread across both desktop and mobile.
 
-- Next.js App Router
-- TypeScript
-- Tailwind CSS
-- IndexedDB for browser-local persistence
-- `pdfjs-dist` for PDF rendering
-- `epubjs` for EPUB rendering
-- Vercel deployment target
+## What Users Can Do
 
-## Local Setup
+- Create an account with email and password
+- Upload their own `PDF` and `EPUB` files
+- Start from the book cover
+- Turn pages using the left and right controls
+- Reopen recent books and continue from the last saved page
+- Swipe up to close the book and return to the shelf
+- Enter Read Mode for a quieter, more immersive session
 
-```bash
-npm.cmd install
-npm.cmd run dev
-```
+## How To Use It
 
-Open `http://localhost:3000`.
+### 1. Create your shelf
 
-PowerShell may block `npm.ps1`, so the commands above use `npm.cmd`.
+Sign up with an email and password. Once signed in, the app opens your personal shelf.
 
-## Features
+### 2. Import a book
 
-- Email and password signup/login
-- Local book import for `PDF` and `EPUB`
-- Realistic 16:9 cover-first reading surface
-- Left and right page-turn navigation
-- Swipe-up gesture to close the reader
-- Tap-to-continue on recently opened books
-- Read Mode with fullscreen, wake lock, and OS-specific Focus guidance
-- Coffee, brown, biscuit, and red-brown visual system across desktop and mobile
+Use the upload area to add a local `PDF` or `EPUB` file. The book appears in your library immediately.
 
-## Deployment To Vercel
+### 3. Open from the cover
 
-1. Push this repository to GitHub.
-2. Import the repository into Vercel as a Next.js project.
-3. Deploy with the default settings.
+Every book begins at its cover. The first interaction is intentionally forward-moving, like opening a real book.
 
-No environment variables are required for the current browser-local version.
+### 4. Read naturally
 
-## Important Vercel Behavior
+Use the right arrow to move deeper into the book and the left arrow to move back. The reading area keeps a wide, book-like composition rather than collapsing into a plain document frame.
 
-- Vercel only hosts the application shell and frontend code.
-- User accounts and uploaded books are not stored on Vercel servers in this version.
-- Each user keeps their own library inside their browser storage.
-- This means the app works well as a shareable hosted experience, but not yet as a multi-device synced product.
+### 5. Continue later
 
-## Verification
+Recently opened books appear in a dedicated section. Tapping one resumes from the last saved page.
 
-```bash
-npm.cmd run typecheck
-npm.cmd run lint
-npm.cmd run build
-```
+### 6. Enter Read Mode
 
-## Next Production Step
+When the user taps **Read Mode**, the app:
 
-If you want true multi-device sync later, add:
+- enters fullscreen when supported
+- requests a screen wake lock when supported
+- shows the right Focus / Do Not Disturb instructions for the current device or OS
 
-- A database for accounts and progress
-- Object storage for uploaded books
-- Real server-side auth and session management
-- Optional encryption or private-library controls
+The app does **not** force system quiet mode directly. Instead, it guides the user to enable it intentionally.
+
+## Storage Behavior
+
+This version is intentionally **browser-local**.
+
+That means:
+
+- the user account is stored in the current browser
+- uploaded books are stored in the current browser on that device
+- reading progress is stored in the same place
+
+It also means:
+
+- switching browsers will not carry the library over
+- switching devices will not carry the library over
+- clearing browser storage will remove the saved shelf
+
+This tradeoff is what makes the app easy to host as a clean web product without requiring cloud storage or a server-side book database.
+
+## Best For
+
+- readers who already download their own ebooks
+- calm, focused reading sessions
+- private, device-local personal libraries
+- lightweight hosted deployment without backend complexity
+
+## Experience Highlights
+
+- Cover-first reading flow
+- Realistic `16:9` book presentation
+- EPUB and PDF support
+- Tap-to-continue recent books
+- Swipe-up close gesture
+- Page-turn sound
+- Read Mode with OS-aware guidance
+- Desktop and mobile-friendly layout
+
+## Important Product Note
+
+This is a **hosted web app with local browser storage**, not yet a cloud-synced ebook platform.
+
+So the product is excellent for:
+
+- personal use
+- demos
+- lightweight deployment
+- local-first reading
+
+It is **not yet** designed for:
+
+- shared cloud libraries
+- cross-device syncing
+- account recovery across browsers
+- server-side ebook storage
+
+## Future Direction
+
+If this grows into a fuller platform later, the next layer would be:
+
+- real cloud authentication
+- encrypted or private library storage
+- cross-device sync
+- account recovery
+- server-side progress persistence
+
+For now, the product stays intentionally simple: open your book, read beautifully, and come back exactly where you left off on the same device.
